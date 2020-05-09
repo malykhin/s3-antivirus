@@ -1,0 +1,4 @@
+node_modules
+test_file
+tmp/*
+.DS_Store

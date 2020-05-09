@@ -1,0 +1,55 @@
+version: '3.7'
+services:
+  localstack:
+    image: localstack/localstack
+    ports:
+      - 4567-4593:4567-4593
+      - 8080:8080
+    environment:
+      - SERVICES=sqs,iam,s3
+      - PORT_WEB_UI=8080
+      - DEBUG=0
+      - DATA_DIR=./tmp/localstack/data
+      - LAMBDA_EXECUTOR=local
+      - KINESIS_ERROR_PROBABILITY=0
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - ./tmp/localstack:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  av-service:
+    build: ./avService
+    ports:
+      - 8000:8000
+    environment:
+      - PORT=8000
+      - AWS_ACCESS_KEY_ID=XXXX
+      - AWS_SECRET_ACCESS_KEY=XXXX
+      - AWS_REGION=us-east-1
+      - AWS_SQS_ENDPOINT=http://localstack:4576
+      - AWS_S3_ENDPOINT=http://localstack:4572
+      - AWS_USE_LOCAL_STACK=true
+      - FILE_CREATION_QUEUE_URL=http://localstack:4576/queue/av-queue
+      - QUARANTINE_PATH=/tmp
+      - AV_STATUS_TAG_NAME=AV_STATUS
+      - AV_STATUS_CLEAN_VALUE=CLEAN
+      - AV_STATUS_IN_PROGRESS_VALUE=IN_PROGRESS
+      - AV_STATUS_INFECTED_VALUE=INFECTED
+    volumes:
+      - ./waitForAlive.js:/tmp/waitForAlive.js
+      - ./avService/entrypoint.sh:/tmp/entrypoint.sh
+      - ./tmp/clamav:/var/lib/clamav
+      - ./avService:/usr/app
+      - ./avService/credentials:/root/.aws/credentials
+    entrypoint: /tmp/entrypoint.sh
+
+  seeder:
+    build: ./seeder
+    volumes:
+      - ./seeder/entrypoint.sh:/usr/tmp/entrypoint.sh
+      - ./seeder/local.tf:/usr/tmp/local.tf
+      - ./waitForAlive.js:/usr/tmp/waitForAlive.js
+    working_dir: /usr/tmp
+    entrypoint: ./entrypoint.sh
+
+  
