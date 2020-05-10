@@ -8,12 +8,14 @@ const {
   avStatusCleanValue,
   avStatusInProgressValue,
   avStatusInfectedValue,
+  safeBucketName,
 } = require('../config')
 
 class AntiVirusRunner {
   constructor(AntiVirus, S3, SQS, File) {
     this.antiVirus = new AntiVirus()
     this.quarantinePath = quarantinePath
+    this.safeBucketName = safeBucketName
     this.sqs = new SQS({
       region,
       queueURL: fileCreationQueueUrl,
@@ -28,14 +30,19 @@ class AntiVirusRunner {
     this.File = File
   }
 
-  copyFile = async (bucketName, objectKey, file) => {
+  copyFileFromS3 = async (bucketName, objectKey, file) => {
     return new Promise((resolve, reject) => {
-      const fileStream = file.getReadStream()
+      const fileStream = file.getWriteStream()
       const s3Stream = this.s3.getReadableStream(bucketName, objectKey)
 
       s3Stream.on('error', reject)
       s3Stream.pipe(fileStream).on('error', reject).on('close', resolve)
     })
+  }
+
+  copyFileToS3 = (bucketName, objectKey, file) => {
+    const fileStream = file.getReadStream()
+    return this.s3.uploadStream(bucketName, objectKey, fileStream)
   }
 
   processPayload = async (data) => {
@@ -47,19 +54,20 @@ class AntiVirusRunner {
     const filePath = path.resolve(this.quarantinePath, objectKey)
     const file = new this.File(filePath)
 
-    await this.copyFile(bucketName, objectKey, file)
+    await this.copyFileFromS3(bucketName, objectKey, file)
 
     await this.s3.putTags(bucketName, objectKey, [{ Key: avStatusTagName, Value: avStatusInProgressValue }])
 
-    const { is_infected: isInfected } = await this.antiVirus.isInfected(filePath)
-
-    await file.delete()
+    const { is_infected: isInfected } = await file.isInfected()
 
     if (isInfected) {
       await this.s3.putTags(bucketName, objectKey, [{ Key: avStatusTagName, Value: avStatusInfectedValue }])
     } else {
+      await this.copyFileToS3(this.safeBucketName, objectKey, file)
       await this.s3.putTags(bucketName, objectKey, [{ Key: avStatusTagName, Value: avStatusCleanValue }])
     }
+
+    await file.delete()
   }
 
   handleError = async (error) => {
@@ -68,6 +76,7 @@ class AntiVirusRunner {
 
   async init() {
     await this.antiVirus.init()
+    this.File.setAntiVirusScanMethod(this.antiVirus.isInfected)
     this.sqs.messageProcessingSequence(this.processPayload, this.handleError)
   }
 }

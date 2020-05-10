@@ -28,7 +28,7 @@ class AntiVirus {
     return this
   }
 
-  isInfected(filePath) {
+  isInfected = (filePath) => {
     if (!this.clamScan) {
       throw new Error('AntiVirus not initialized')
     }

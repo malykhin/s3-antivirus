@@ -23,6 +23,10 @@ resource "aws_s3_bucket" "import_bucket" {
   bucket = "import-bucket"
 }
 
+resource "aws_s3_bucket" "safe_bucket" {
+  bucket = "safe-bucket"
+}
+
 resource "aws_s3_bucket_policy" "import_bucket_policy" {
   bucket = aws_s3_bucket.import_bucket.id
 

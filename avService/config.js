@@ -7,6 +7,7 @@ module.exports = {
     useLocalStack: process.env.AWS_USE_LOCAL_STACK,
   },
   fileCreationQueueUrl: process.env.FILE_CREATION_QUEUE_URL,
+  safeBucketName: process.env.SAFE_BUCKET_NAME,
   quarantinePath: process.env.QUARANTINE_PATH,
   avStatusTagName: process.env.AV_STATUS_TAG_NAME,
   avStatusCleanValue: process.env.AV_STATUS_CLEAN_VALUE,
